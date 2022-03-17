@@ -1,0 +1,29 @@
+{
+  "name": "glitch-gldata",
+  "version": "0.0.1",
+  "description": "data proxy for weather, wind and wave data localized",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^0.26.0",
+    "cache-manager": "^3.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.17.3",
+    "express-cache-middleware": "^1.0.1"
+  },
+  "engines": {
+    "node": "12.x"
+  },
+  "repository": {
+    "url": "https://glitch.com/edit/#!/glitch-mvp-node"
+  },
+  "license": "MIT",
+  "keywords": [
+    "node",
+    "glitch",
+    "express",
+    "weather"
+  ]
+}
