@@ -3,6 +3,7 @@ const axios = require('axios');
 const cors = require('cors');
 const expressCache = require('express-cache-middleware');
 const cacheManager = require('cache-manager');
+const conditionLocations = require('./conditionLocations.json');
 
 const cacheMiddleware = new expressCache(
 	cacheManager.caching({
@@ -108,7 +109,7 @@ function convertTime_(str) {
 	return Date.parse(dstr);
 }
 
-function parseVals(onecall,forecast,timestart,timelast, onecall_accfun, forecast_accfun) {
+function owm_parseVals(onecall,forecast,timestart,timelast, onecall_accfun, forecast_accfun) {
 	var ts = timestart/1000; // seconds epoch
 	const te = timelast/1000;
 	var timeArr = [];
@@ -172,16 +173,52 @@ function get_owm_api_key() {
 	return ak
 }
 
+app.get('/conditionLocations.json', function(req,resp) {
+	console.log('GET on conditionLocations.json from source URIs');
+	var cls = conditionLocations;
+	if(req.query.namekey) {
+		var cl = conditionLocations.find(el => el.name === req.query.namekey);
+		if(cl) {
+			cls = [ cl ];
+		}
+	}
+	resp.status(200).send(cls);
+});
+
+const owm_key = get_owm_api_key();
+
+function getLocationInfo(namekey) {
+	var cl = conditionLocations.find( el => el.name === namekey);
+	if(cl) {
+		console.log("found record for " + namekey);
+	} else {
+		console.log("record for " + namekey + " was not found");
+	}
+	const glerl_base_url = 'https://www.glerl.noaa.gov/emf/waves/WW3/point/wave';
+	const glerl_location_suffix = cl.suffix || '-79.79-43.31.txt';
+    cl.glerl_time = glerl_base_url + 'time' + glerl_location_suffix;
+    cl.glerl_wind = glerl_base_url + 'wind' + glerl_location_suffix;
+    cl.glerl_hgt = glerl_base_url + 'hgt' + glerl_location_suffix;
+	const weather_base_url = 'https://api.openweathermap.org/data/2.5/'
+	const lat = cl.coord[0] || 43.2795; // default to burlington
+	const lon = cl.coord[1] || -79.7310;
+	const weather_api1 = 'onecall?lat=' + lat + '&lon=' + lon + '&units=metric&appid=' + owm_key;
+	const weather_api2 = 'forecast?lat=' + lat + '&lon=' + lon + '&units=metric&appid=' + owm_key;	
+	cl.owm_onecall = weather_base_url + weather_api1;
+	cl.owm_forecast = weather_base_url + weather_api2;
+	cl.iwd = parseInt(cl.ideal_wind_dir) || 270;
+	return cl;
+}
+
 app.get('/windwaves.json', function (req,resp) {
 	console.log('GET on windwaves.json from source URIs');
-	const base_url = 'https://www.glerl.noaa.gov/emf/waves/WW3/point/wave';
-	const location_suffix = '-79.79-43.31.txt';
+	const cl = getLocationInfo(req.query.namekey || 'Burlington');
 	axios.all([
-		axios.get( base_url + 'time' + location_suffix),
-		axios.get( base_url + 'wind' + location_suffix),
-		axios.get( base_url + 'hgt'  + location_suffix) 
+		axios.get( cl.glerl_time),
+		axios.get( cl.glerl_wind),
+		axios.get( cl.glerl_hgt) 
 	]).then(axios.spread((time, wind, hgt) => {
-		console.log('time: ', time.data);
+		//console.log('time: ', time.data);
 		//console.log('wind: ', wind.data);
 		//console.log('hgt: ', hgt.data);
 		const time_str_arr = time.data.split(',');
@@ -212,23 +249,55 @@ app.get('/windwaves.json', function (req,resp) {
 	})).catch( err => resp.send(err));
 });
 
-const owm_key = get_owm_api_key();
-
-app.get('/weatherwindwaves.json', function (req,resp) {
-	console.log('GET on weatherwaves.json from source URIs');
-	const glerl_base_url = 'https://www.glerl.noaa.gov/emf/waves/WW3/point/wave';
-	const glerl_location_suffix = req.query.suffix || '-79.79-43.31.txt';
-  const ideal_wind_dir = parseInt(req.query.iwd || '270');
-  console.log("ideal wind dir is ", ideal_wind_dir);
-	const weather_base_url = 'https://api.openweathermap.org/data/2.5/'
-	const weather_api1 = 'onecall?lat=43.2795&lon=-79.7310&units=metric&appid=' + owm_key;
-	const weather_api2 = 'forecast?lat=43.2795&lon=-79.7310&units=metric&appid=' + owm_key;
+app.get('/weather.json', function (req,resp) {
+	console.log('GET on weather.json from source URIs');
+	const cl = getLocationInfo(req.query.namekey || 'Burlington');
 	axios.all([
-		axios.get( glerl_base_url + 'time' + glerl_location_suffix),
-		axios.get( glerl_base_url + 'wind' + glerl_location_suffix),
-		axios.get( glerl_base_url + 'hgt'  + glerl_location_suffix),
-		axios.get( weather_base_url + weather_api1 ),
-		axios.get( weather_base_url + weather_api2 )
+		axios.get( cl.owm_onecall ),
+		axios.get( cl.owm_forecast )
+	]).then(axios.spread((onecall, forecast) => {
+		const timestart = onecall.data.hourly[0].dt * 1000; // expect msec
+		console.log('date start -> ' + timestart);
+		console.log('owm ' + onecall.data.timezone + ', ' + forecast.data.cnt);
+		//const timenext = convertTime_(time_str_arr[1]);
+		const timeinterval = 1000*3600; //1hr in msec
+		const timelast = forecast.data.list[forecast.data.list.length-1].dt * 1000; // expect msec
+		console.log('date last -> ' + timelast);
+		var imperial_series = [];
+		imperial_series.push({
+			name: 'OWM Temp (C)',
+			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.temp, (js) => js.main.temp),
+			name2: 'OWM RealFeel Temp (C)',
+			data2: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.feels_like, (js) => js.main.feels_like)
+		});
+		imperial_series.push({
+			name: 'OWM Wind (m/s)',
+			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_speed, (js) => js.wind.speed),
+			name2: 'OWM Gusts (m/s)',
+			data2: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_gust, (js) => js.wind.gust)
+		});
+		imperial_series.push({
+			name: 'OWM Wind Direction (deg)',
+			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_deg, (js) => js.wind.deg),
+		});
+		resp.status(200).send({
+			pointInterval: timeinterval,
+			pointStart: timestart,
+			imperialSeries: imperial_series,
+		});
+	})).catch( err => resp.send(err));
+});
+
+function fetch_weatherwindwaves(namekey) {
+	const cl = getLocationInfo(namekey || 'Burlington');
+    const ideal_wind_dir = cl.iwd;
+    console.log("ideal wind dir is ", ideal_wind_dir);
+	var p = axios.all([
+		axios.get( cl.glerl_time ),
+		axios.get( cl.glerl_wind ),
+		axios.get( cl.glerl_hgt ),
+		axios.get( cl.owm_onecall ),
+		axios.get( cl.owm_forecast )
 	]).then(axios.spread((time, wind, hgt, onecall, forecast) => {
 		const time_str_arr = time.data.split(',');
 		const timestart = convertTime_(time_str_arr[0]);
@@ -246,32 +315,87 @@ app.get('/weatherwindwaves.json', function (req,resp) {
 		const timelast = timestart + timeinterval*(imperial_series[0].data.length - 1);
 		imperial_series.push({
 			name: 'OWM Temp (C)',
-			data: parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.temp, (js) => js.main.temp),
+			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.temp, (js) => js.main.temp),
 			name2: 'OWM RealFeel Temp (C)',
-			data2: parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.feels_like, (js) => js.main.feels_like)
+			data2: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.feels_like, (js) => js.main.feels_like)
 		});
 		imperial_series.push({
 			name: 'OWM Wind (m/s)',
-			data: parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_speed, (js) => js.wind.speed),
+			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_speed, (js) => js.wind.speed),
 			name2: 'OWM Gusts (m/s)',
-			data2: parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_gust, (js) => js.wind.gust)
+			data2: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_gust, (js) => js.wind.gust)
 		});
 		imperial_series.push({
 			name: 'OWM Wind Direction (deg)',
-			data: parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_deg, (js) => js.wind.deg),
-		});
+			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_deg, (js) => js.wind.deg),
+		})
 		const scores = compute_score(imperial_series, ideal_wind_dir);
 		imperial_series.push({ // for debugging really
 			name: 'score',
 			data: scores
 		});
-		resp.status(200).send({
+		return {
 			pointInterval: timeinterval,
 			pointStart: timestart,
 			imperialSeries: imperial_series,
 			scoreSeries: scores
-		});
-	})).catch( err => resp.send(err));
+		};
+	}))
+	return p;
+}
+
+app.get('/weatherwindwaves.json', function (req,resp) {
+	console.log('GET on weatherwindwaves.json from source URIs');
+	fetch_weatherwindwaves(req.query.namekey)
+		.then( dataResponse => resp.status(200).send(dataResponse) )
+		.catch( err => resp.send(err) );
+});
+
+app.get('/lakescores.json', function(req, resp) {
+	console.log('GET on lakescores.json from source URIs');
+	const cls = conditionLocations.filter(cl => cl.lake === req.query.lake);
+	const ncls = cls.length;
+	var rl = [];
+	var hitError = null;
+	var pointInterval = null;
+	var pointStart = null;
+	var promises = [];
+	for(var i=0; i<ncls; i++) {
+		promises.push(fetch_weatherwindwaves(cls[i].name));
+	}
+	Promise.all(promises)
+		.then(
+			rls => {
+				rls.forEach((r,i) => {
+					rl.push({ name: cls[i].name, scoreSeries: r.scoreSeries });
+					pointInterval = r.pointInterval;
+					pointStart = r.pointStart;
+				});
+				const threshold = req.query.threshold || 0.50;
+				var result = {
+					pointInterval: pointInterval,
+					pointStart: pointStart,
+					goodScores: []
+				};
+				if(rl.length>0) {
+					var ts = pointStart;
+					for(var j=0; j<rl[0].scoreSeries.length; j++) {
+						var goodones = [];
+						for(var k=0; k< rl.length; k++) {
+							if(rl[k].scoreSeries[j]>threshold) {
+								goodones.push(rl[k].name);
+							}
+						}
+						if(goodones.length>0) {
+							result.goodScores.push({ ts: ts, good: goodones });
+						}
+						ts += pointInterval;
+					}
+				}
+				resp.status(200).send(result);
+			});
+		//.error( e => resp.send(e));
+			
 });
 
 app.set('port', process.env.PORT || CORS_PROXY_PORT);

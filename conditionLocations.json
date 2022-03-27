@@ -1,0 +1,121 @@
+ [{ 
+    "lake": "o", 
+    "name":"Burlington",  
+    "coord": [43.297799,-79.793822], 
+    "suffix":"-79.79-43.31.txt", 
+    "eccode":"on-95", 
+    "loofs":"loofs/wwwgraphics/LOOFS_{XTYPE}_burl",
+    "ideal_wind_dir": 270,
+    "wug": "burlington",
+    "windy":"43.309/-79.800?43.225,-79.761,12" 
+}, { 
+    "lake": "o", 
+    "name":"Fifty point", 
+    "coord": [43.2246226, -79.618827], 
+    "suffix":"-79.62-43.23.txt", 
+    "eccode":"on-77", 
+    "loofs":"loofs/wwwgraphics/LOOFS_{XTYPE}_buo2",
+    "ideal_wind_dir": 338,
+    "wug":"hamilton", 
+    "windy":"43.208/-79.651?43.201,-79.651,12" 
+}, { 
+    "lake": "o", 
+    "name":"Bronte",      
+    "coord": [43.3922,-79.709836], 
+    "suffix":"-79.71-43.39.txt", 
+    "eccode":"on-79", 
+    "loofs":"loofs/wwwgraphics/LOOFS_{XTYPE}_burl",
+    "ideal_wind_dir": 233,
+    "wug":"oakville", 
+    "windy": "43.407/-79.727?43.400,-79.727,12" 
+}, { 
+    "lake": "o", 
+    "name":"Oakville",    
+    "coord": [43.44136368, -79.6671526], 
+    "suffix":"-79.66-43.44.txt", 
+    "eccode":"on-79",  
+    "loofs":"loofs/wwwgraphics/LOOFS_{XTYPE}_buo2",
+    "ideal_wind_dir": 233,
+    "wug": "oakville",
+    "windy":"43.447/-79.667?43.419,-79.667,12" 
+}, { 
+    "lake": "o", 
+    "name":"Port Credit", 
+    "coord": [43.549955, -79.5858134], 
+    "suffix":"-79.57-43.54.txt", 
+    "eccode":"on-24", 
+    "loofs":"loofs/wwwgraphics/LOOFS_{XTYPE}_buo2",
+    "wug":"mississauga", 
+    "ideal_wind_dir": 233,
+    "windy":"43.554/-79.584?43.526,-79.584,12" 
+}, { 
+    "lake": "e", 
+    "name": "Port Colborne",
+    "coord": [42.872974, -79.273258],
+    "suffix": "-79.24-42.86.txt",
+    "eccode": "on-80",
+    "loofs":"leofs/wwwgraphics/LEOFS_{XTYPE}_pcol",
+    "wug":"port-colborne",
+    "ideal_wind_dir": 180,
+    "windy":"42.886/-79.251?42.892,-79.324,12"
+}, { 
+    "lake": "h", 
+    "name": "Goderich",
+    "coord": [43.74354455, -81.7263280],
+    "suffix": "-81.74-43.74.txt",
+    "eccode": "on-160",
+    "loofs": "lmhofs/wwwgraphics/LMHOFS_{XTYPE}_solh",
+    "wug": "goderich",
+    "ideal_wind_dir": 90,
+    "windy": "43.743/-81.711?43.289,-81.711,12"
+}, { 
+    "lake": "h", 
+    "name": "Collingwood",
+    "coord": [ 44.5083326, -80.204999 ],
+    "suffix": "-80.21-44.51.txt",
+    "eccode": "on-150",
+    "loofs": "lmhofs/wwwgraphics/LMHOFS_{XTYPE}_sgeb",
+    "wug": "collingwood",
+    "ideal_wind_dir": 0,
+    "windy": "44.503/-80.217?44.056,-80.217,12"
+}, {
+    "lake": "h",
+    "name": "Sauble Beach",
+    "coord": [44.629453, -81.270948],
+    "suffix": "-81.29-44.63.txt",
+    "eccode": "on-62",
+    "loofs": "lmhofs/wwwgraphics/LMHOFS_{XTYPE}_solh",
+    "wug": "sauble-beach",
+    "ideal_wind_dir": 90,
+    "windy": "44.629/-81.275?44.182,-81.275,12"
+}, {
+    "lake": "e",
+    "name": "West Long Point",
+    "coord": [42.578427, -80.390248],
+    "suffix": "-80.41-42.53.txt",
+    "eccode": "on-161",
+    "loofs": "leofs/wwwgraphics/LEOFS_wind_psta",
+    "wug": "port-burwell",
+    "ideal_wind_dir": 90,
+    "windy": "42.578/-80.410?42.571,-80.410,12"
+}, {
+    "lake": "e",
+    "name": "Turkey Point",
+    "coord": [42.68343, -80.329563],
+    "suffix": "-80.21-42.64.txt",
+    "eccode": "on-161",
+    "loofs": "leofs/wwwgraphics/LEOFS_wind_pcol",
+    "wug": "port-rowan",
+    "ideal_wind_dir": 270,
+    "windy": "42.680/-80.327?42.673,-80.327,14"
+}, {
+    "lake": "o",
+    "name": "Sandbanks",
+    "coord": [43.898958, -77.228226],
+    "suffix": "-77.29-43.88.txt",
+    "eccode": "on-27",
+    "loofs": "loofs/wwwgraphics/LOOFS_wind_buo3",
+    "wug": "bloomfield",
+    "ideal_wind_dir": 135,
+    "windy": "43.905/-77.290?43.877,-77.290,12"
+}]
