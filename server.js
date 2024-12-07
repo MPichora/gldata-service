@@ -257,6 +257,20 @@ app.get('/windwaves.json', function (req,resp) {
 	})).catch( err => resp.send(err));
 });
 
+function om_trim_scale_data(data, scaleby, startat, endat) {
+	var rArr = [];
+    for(var i=startat; i<=endat; i++) {
+		if(i<0) {
+			rArr.push(data[0]*scaleby);
+		} else if(i>data.length-1) {
+			rArr.push(data[data.length-1]*scaleby);
+		} else {
+			rArr.push(data[i]*scaleby)
+		}
+	}
+	return rArr;
+}
+
 app.get('/weather.json', function (req,resp) {
 	console.log('GET on weather.json from source URIs');
 	const cl = getLocationInfo(req.query.namekey || 'Burlington');
@@ -264,7 +278,7 @@ app.get('/weather.json', function (req,resp) {
 	axios.get( cl.om_onecall ).then( (onecall) => {
 		const timestart = Date.parse(onecall.data.hourly.time[0] + 'Z') ; // expect msec
 		console.log('date start -> ' + timestart);
-		console.log('om ' + onecall.data.timezone);
+		console.log('om tz ' + onecall.data.timezone);
 		//const timenext = convertTime_(time_str_arr[1]);
 		const timeinterval = 1000*3600; //1hr in msec
 		const timelast = (onecall.data.hourly.time.length-1)*timeinterval + timestart; // expect msec
@@ -276,11 +290,13 @@ app.get('/weather.json', function (req,resp) {
 			name2: 'OM Apparent Temp (C)',
 			data2: onecall.data.hourly.apparent_temperature_2m,
 		});
+		const om_startat = 0;
+		const om_endat = onecall.data.hourly.time.length-1;
 		imperial_series.push({
-			name: 'OM Wind (km/h)',
-			data: onecall.data.hourly.wind_speed_10m,
-			name2: 'OM Gusts (km/h)',
-			data2: onecall.data.hourly.wind_gusts_10m,
+			name: 'OM Wind (m/s)',
+			data: om_trim_scale_data(onecall.data.hourly.wind_speed_10m,0.27778,om_startat,om_endat),
+			name2: 'OM Gusts (m/s)',
+			data2: om_trim_scale_data(onecall.data.hourly.wind_gusts_10m,0.27778,om_startat,om_endat),
 		});
 		imperial_series.push({
 			name: 'OM Wind Direction (deg)',
@@ -342,15 +358,13 @@ function fetch_weatherwindwaves(namekey) {
 		axios.get( cl.glerl_time ),
 		axios.get( cl.glerl_wind ),
 		axios.get( cl.glerl_hgt ),
-		axios.get( cl.owm_onecall ),
-		axios.get( cl.owm_forecast )
-	]).then(axios.spread((time, wind, hgt, onecall, forecast) => {
+		axios.get( cl.om_onecall )
+	]).then(axios.spread((time, wind, hgt, onecall) => {
 		const time_str_arr = time.data.split(',');
-		const timestart = convertTime_(time_str_arr[0]);
-		console.log('date start ' + time_str_arr[0] + ' -> ' + timestart);
-		console.log('owm ' + onecall.data.timezone + ', ' + forecast.data.cnt);
+		const gl_timestart = convertTime_(time_str_arr[0]);
+		console.log('waves date start ' + time_str_arr[0] + ' -> ' + gl_timestart);
 		const timenext = convertTime_(time_str_arr[1]);
-		const timeinterval = timenext - timestart;
+		const timeinterval = timenext - gl_timestart;
 		var imperial_series = [{
 			name: 'GLERL Wind (knots)',
 			data: parseFloatArrAndScale(1.9438, wind.data)
@@ -358,23 +372,34 @@ function fetch_weatherwindwaves(namekey) {
 			name: 'GLERL Waves (ft)',
 			data: parseFloatArrAndScale(3.281, hgt.data)
 		}];
-		const timelast = timestart + timeinterval*(imperial_series[0].data.length - 1);
+		const gl_timelast = gl_timestart + timeinterval*(imperial_series[0].data.length - 1);
+
+		console.log('om tz' + onecall.data.timezone);
+		const om_timestart = Date.parse(onecall.data.hourly.time[0] + 'Z') ; // expect msec
+		const om_timelast = (onecall.data.hourly.time.length-1)*timeinterval + om_timestart; // expect msec
+		console.log('om date start -> ' + om_timestart + ' gl date start -> ' + gl_timestart);
+		console.log('om date last -> ' + om_timelast + ' gl date last -> ' + gl_timelast);
+		// these relative indices can be negative (by design) the trim function fixes that.
+		// they can also be too large vs the underlying weather data array (also trim does it)
+		const om_startat = ((gl_timestart - om_timestart)/timeinterval);
+		const om_endat = ((gl_timelast - gl_timestart)/timeinterval) + om_startat;
 		imperial_series.push({
-			name: 'OWM Temp (C)',
-			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.temp, (js) => js.main.temp),
-			name2: 'OWM RealFeel Temp (C)',
-			data2: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.feels_like, (js) => js.main.feels_like)
+			name: 'OM Temp (C)',
+			data: om_trim_scale_data(onecall.data.hourly.temperature_2m,1.0,om_startat,om_endat),
+			name2: 'OM Apparent Temp (C)',
+			data2: onecall.data.hourly.apparent_temperature_2m,
 		});
 		imperial_series.push({
-			name: 'OWM Wind (m/s)',
-			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_speed, (js) => js.wind.speed),
-			name2: 'OWM Gusts (m/s)',
-			data2: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_gust, (js) => js.wind.gust)
+			name: 'OM Wind (m/s)',
+			data: om_trim_scale_data(onecall.data.hourly.wind_speed_10m,0.27778,om_startat,om_endat),
+			name2: 'OM Gusts (m/s)',
+			data2: om_trim_scale_data(onecall.data.hourly.wind_gusts_10m,0.27778,om_startat,om_endat),
 		});
 		imperial_series.push({
-			name: 'OWM Wind Direction (deg)',
-			data: owm_parseVals(onecall.data,forecast.data,timestart,timelast, (js) => js.wind_deg, (js) => js.wind.deg),
-		})
+			name: 'OM Wind Direction (deg)',
+			data: om_trim_scale_data(onecall.data.hourly.wind_direction_10m,1.0,om_startat,om_endat),
+		});
+
 		const scores = compute_score(imperial_series, ideal_wind_dir);
 		imperial_series.push({ // for debugging really
 			name: 'score',
@@ -382,7 +407,7 @@ function fetch_weatherwindwaves(namekey) {
 		});
 		return {
 			pointInterval: timeinterval,
-			pointStart: timestart,
+			pointStart: gl_timestart,
 			imperialSeries: imperial_series,
 			scoreSeries: scores
 		};
