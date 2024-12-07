@@ -177,12 +177,12 @@ app.get('/conditionLocations.json', function(req,resp) {
 	console.log('GET on conditionLocations.json from source URIs');
 	var cls = conditionLocations;
 	if(req.query.namekey) {
-		var cl = conditionLocations.find(el => el.name === req.query.namekey);
+		var cl = conditionLocations.find(el => el.name === namekey);
 		if(cl) {
 			cls = [ cl ];
 		}
 	}
-	resp.status(200).send(cls);
+	resp.status(200).send(conditionLocations);
 });
 
 const owm_key = get_owm_api_key();
@@ -196,16 +196,24 @@ function getLocationInfo(namekey) {
 	}
 	const glerl_base_url = 'https://www.glerl.noaa.gov/emf/waves/WW3/point/wave';
 	const glerl_location_suffix = cl.suffix || '-79.79-43.31.txt';
-    cl.glerl_time = glerl_base_url + 'time' + glerl_location_suffix;
-    cl.glerl_wind = glerl_base_url + 'wind' + glerl_location_suffix;
-    cl.glerl_hgt = glerl_base_url + 'hgt' + glerl_location_suffix;
-	const weather_base_url = 'https://api.openweathermap.org/data/2.5/'
+        cl.glerl_time = glerl_base_url + 'time' + glerl_location_suffix;
+        cl.glerl_wind = glerl_base_url + 'wind' + glerl_location_suffix;
+        cl.glerl_hgt = glerl_base_url + 'hgt' + glerl_location_suffix;
 	const lat = cl.coord[0] || 43.2795; // default to burlington
 	const lon = cl.coord[1] || -79.7310;
-	const weather_api1 = 'onecall?lat=' + lat + '&lon=' + lon + '&units=metric&appid=' + owm_key;
-	const weather_api2 = 'forecast?lat=' + lat + '&lon=' + lon + '&units=metric&appid=' + owm_key;	
-	cl.owm_onecall = weather_base_url + weather_api1;
-	cl.owm_forecast = weather_base_url + weather_api2;
+	//owm urls
+	const owm_weather_base_url = 'https://api.openweathermap.org/data/2.5/';
+	const owm_weather_api1 = 'onecall?lat=' + lat + '&lon=' + lon + '&units=metric&appid=' + owm_key;
+	const owm_weather_api2 = 'forecast?lat=' + lat + '&lon=' + lon + '&units=metric&appid=' + owm_key;	
+	cl.owm_onecall = owm_weather_base_url + owm_weather_api1;
+	cl.owm_forecast = owm_weather_base_url + owm_weather_api2;
+	//open-meteo urls
+	const om_weather_base_url = 'https://api.open-meteo.com/v1/forecast?';
+	const om_weather_api_tail = '&hourly=temperature_2m,apparent_temperature,wind_speed_10m,'
+		+'wind_direction_10m,wind_gusts_10m&models=best_match&forecast_days=10';
+	const om_weather_api = 'latitude=' + lat + '&longitude=' + lon + om_weather_api_tail;
+	cl.om_onecall = om_weather_base_url + om_weather_api;
+	// ideal weather direction
 	cl.iwd = parseInt(cl.ideal_wind_dir) || 270;
 	return cl;
 }
@@ -251,6 +259,44 @@ app.get('/windwaves.json', function (req,resp) {
 
 app.get('/weather.json', function (req,resp) {
 	console.log('GET on weather.json from source URIs');
+	const cl = getLocationInfo(req.query.namekey || 'Burlington');
+	//console.log('get on ' + cl.om_onecall);
+	axios.get( cl.om_onecall ).then( (onecall) => {
+		const timestart = Date.parse(onecall.data.hourly.time[0] + 'Z') ; // expect msec
+		console.log('date start -> ' + timestart);
+		console.log('om ' + onecall.data.timezone);
+		//const timenext = convertTime_(time_str_arr[1]);
+		const timeinterval = 1000*3600; //1hr in msec
+		const timelast = (onecall.data.hourly.time.length-1)*timeinterval + timestart; // expect msec
+		console.log('date last -> ' + timelast);
+		var imperial_series = [];
+		imperial_series.push({
+			name: 'OM Temp (C)',
+			data: onecall.data.hourly.temperature_2m,
+			name2: 'OM Apparent Temp (C)',
+			data2: onecall.data.hourly.apparent_temperature_2m,
+		});
+		imperial_series.push({
+			name: 'OM Wind (km/h)',
+			data: onecall.data.hourly.wind_speed_10m,
+			name2: 'OM Gusts (km/h)',
+			data2: onecall.data.hourly.wind_gusts_10m,
+		});
+		imperial_series.push({
+			name: 'OM Wind Direction (deg)',
+			data: onecall.data.hourly.wind_direction_10m,
+		});
+		resp.status(200).send({
+			pointInterval: timeinterval,
+			pointStart: timestart,
+			imperialSeries: imperial_series,
+		});
+
+	}).catch( err => resp.send(err));
+});
+
+app.get('/owm_weather.json', function (req,resp) {
+	console.log('GET on owm_weather.json from source URIs');
 	const cl = getLocationInfo(req.query.namekey || 'Burlington');
 	axios.all([
 		axios.get( cl.owm_onecall ),
