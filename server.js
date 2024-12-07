@@ -177,7 +177,7 @@ app.get('/conditionLocations.json', function(req,resp) {
 	console.log('GET on conditionLocations.json from source URIs');
 	var cls = conditionLocations;
 	if(req.query.namekey) {
-		var cl = conditionLocations.find(el => el.name === namekey);
+		var cl = conditionLocations.find(el => el.name === req.query.namekey);
 		if(cl) {
 			cls = [ cl ];
 		}
