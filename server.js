@@ -387,7 +387,7 @@ function fetch_weatherwindwaves(namekey) {
 			name: 'OM Temp (C)',
 			data: om_trim_scale_data(onecall.data.hourly.temperature_2m,1.0,om_startat,om_endat),
 			name2: 'OM Apparent Temp (C)',
-			data2: onecall.data.hourly.apparent_temperature_2m,
+			data2: om_trim_scale_data(onecall.data.hourly.apparent_temperature_2m,1.0,om_startat,om_endat),
 		});
 		imperial_series.push({
 			name: 'OM Wind (m/s)',
